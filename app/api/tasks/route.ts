@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 
 import { connectToDatabase } from "@/lib/db";
-import { Volunteer } from "@/lib/models/volunteer";
+import { Task } from "@/lib/models/task";
 
 export async function GET() {
   try {
     await connectToDatabase();
-    const volunteers = await Volunteer.find().sort({ createdAt: -1 });
+    const tasks = await Task.find().sort({ createdAt: -1 });
 
-    return NextResponse.json(volunteers, { status: 200 });
+    return NextResponse.json(tasks, { status: 200 });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Unable to fetch volunteers.";
+      error instanceof Error ? error.message : "Unable to fetch tasks.";
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -21,12 +21,12 @@ export async function POST(request: Request) {
   try {
     await connectToDatabase();
     const payload = await request.json();
-    const volunteer = await Volunteer.create(payload);
+    const task = await Task.create(payload);
 
-    return NextResponse.json(volunteer, { status: 201 });
+    return NextResponse.json(task, { status: 201 });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Unable to create volunteer.";
+      error instanceof Error ? error.message : "Unable to create task.";
 
     return NextResponse.json({ error: message }, { status: 400 });
   }

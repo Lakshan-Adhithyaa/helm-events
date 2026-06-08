@@ -1,6 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 :root {
   --background: #f8fafc;
@@ -42,16 +40,4 @@ textarea {
 
 ::selection {
   background: rgba(14, 165, 233, 0.22);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
 }

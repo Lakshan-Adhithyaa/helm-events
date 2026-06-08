@@ -27,10 +27,19 @@ export async function connectToDatabase() {
   }
 
   if (!cache.promise) {
-    cache.promise = mongoose.connect(DATABASE_URI, {
-      dbName: "helm-events",
-      bufferCommands: false,
-    });
+    cache.promise = mongoose
+      .connect(DATABASE_URI, {
+        bufferCommands: false,
+      })
+      .then((mongooseInstance) => {
+        console.log("MongoDB connection successful.");
+        return mongooseInstance;
+      })
+      .catch((error: unknown) => {
+        console.error("MongoDB connection failed.", error);
+        cache.promise = null;
+        throw error;
+      });
   }
 
   cache.conn = await cache.promise;
