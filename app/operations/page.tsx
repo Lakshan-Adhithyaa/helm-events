@@ -15,6 +15,11 @@ import { Shift } from "@/models/shift";
 import { CollectionView } from "@/components/operations/collection-view";
 import { ActivityTimeline } from "@/components/operations/activity-timeline";
 import { DemoGenerator } from "@/components/operations/demo-generator";
+import { NewEventButton } from "@/components/operations/new-event-button";
+import {
+  ActiveEventOverview,
+  type EventSummary,
+} from "@/components/operations/active-event-overview";
 import Link from "next/link";
 import {
   Users,
@@ -28,7 +33,6 @@ import {
   ArrowLeft,
   CaretRight,
   Clock,
-  CheckCircle,
   Buildings,
   IdentificationCard,
   ListBullets,
@@ -63,10 +67,12 @@ export default async function OperationsPage({
   let incidentCount = 0;
   let shiftCount = 0;
   let latestEvent: (EventDocument & { _id: { toString(): string } }) | null = null;
+  let events: EventSummary[] = [];
 
   // Conditional data fetching
   if (!collection) {
-    // Dashboard overview requires all counts and the full latest event
+    // Dashboard overview requires all counts, every event (for the switcher),
+    // and the latest event as the default active selection.
     const results = await Promise.all([
       Event.countDocuments(),
       Speaker.countDocuments(),
@@ -81,7 +87,7 @@ export default async function OperationsPage({
       Task.countDocuments(),
       Incident.countDocuments(),
       Shift.countDocuments(),
-      Event.findOne().sort({ createdAt: -1 }).lean(),
+      Event.find().sort({ createdAt: -1 }).lean(),
     ]);
 
     const counts = results.slice(0, 13) as number[];
@@ -100,7 +106,20 @@ export default async function OperationsPage({
       incidentCount,
       shiftCount,
     ] = counts;
-    latestEvent = results[13] as (EventDocument & { _id: { toString(): string } }) | null;
+    const eventDocs = results[13] as unknown as Array<
+      EventDocument & { _id: { toString(): string } }
+    >;
+    events = eventDocs.map((doc) => ({
+      _id: doc._id.toString(),
+      name: doc.name,
+      venue: doc.venue,
+      city: doc.city,
+      timezone: doc.timezone,
+      startDate: doc.startDate ? new Date(doc.startDate).toISOString() : undefined,
+      endDate: doc.endDate ? new Date(doc.endDate).toISOString() : undefined,
+      status: doc.status,
+    }));
+    latestEvent = eventDocs[0] ?? null;
   } else if (!eventId) {
     // Collection view needs the latest event ID as a fallback if no eventId is provided
     latestEvent = await Event.findOne()
@@ -376,7 +395,8 @@ export default async function OperationsPage({
               Centralized operational control for your event ecosystem.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            <NewEventButton />
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-slate-200 ring-inset">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               Connected to MongoDB
@@ -385,134 +405,36 @@ export default async function OperationsPage({
         </header>
 
         {/* Event Overview Section */}
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto]">
-            <div className="p-8">
-              <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
-                  <Calendar size={24} weight="bold" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-indigo-600">
-                    Active Event Overview
-                  </h2>
-                </div>
-              </div>
+        <ActiveEventOverview
+          events={events}
+          initialActiveEventId={latestEvent?._id?.toString() ?? null}
+          speakerCount={speakerCount}
+          sessionCount={sessionCount}
+          volunteerCount={volunteerCount}
+        />
 
-              {latestEvent ? (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                      {latestEvent.name}
-                    </h3>
-                    <div className="mt-2 flex flex-wrap gap-4 text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin size={18} />
-                        <span>
-                          {latestEvent.venue}, {latestEvent.city}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Clock size={18} />
-                        <span>
-                          {latestEvent.startDate && new Date(latestEvent.startDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }
-                          )}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <CheckCircle size={18} className="text-emerald-500" />
-                        <span className="capitalize">{latestEvent.status}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-6 sm:grid-cols-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        Speakers
-                      </p>
-                      <p className="text-xl font-bold text-slate-900">
-                        {speakerCount}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        Sessions
-                      </p>
-                      <p className="text-xl font-bold text-slate-900">
-                        {sessionCount}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        Volunteers
-                      </p>
-                      <p className="text-xl font-bold text-slate-900">
-                        {volunteerCount}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        Status
-                      </p>
-                      <div className="mt-1">
-                        <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                          80% Ready
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-4">
-                  <p className="text-slate-500">
-                    No events found. Start by creating your first event.
-                  </p>
-                  <Link
-                    href="?collection=events"
-                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
-                  >
-                    Create Event
-                    <CaretRight size={16} weight="bold" />
-                  </Link>
-                </div>
-              )}
-            </div>
-            <div className="hidden border-l border-slate-100 bg-slate-50/50 p-5 sm:p-8 lg:block lg:w-80">
-              <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">
-                Quick Actions
-              </h4>
-              <div className="space-y-3">
-                <DemoGenerator />
-                <Link
-                  href="?collection=events"
-                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700 transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
-                >
-                  Create New Event
-                  <CaretRight size={14} />
-                </Link>
-                <Link
-                  href="?collection=speakers"
-                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700 transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
-                >
-                  Add Keynote Speaker
-                  <CaretRight size={14} />
-                </Link>
-                <Link
-                  href="?collection=sessions"
-                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700 transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
-                >
-                  Schedule Session
-                  <CaretRight size={14} />
-                </Link>
-              </div>
-            </div>
+        {/* Quick Actions */}
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+          <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">
+            Quick Actions
+          </h4>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <DemoGenerator />
+            <NewEventButton />
+            <Link
+              href="?collection=speakers"
+              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700 transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
+            >
+              Add Keynote Speaker
+              <CaretRight size={14} />
+            </Link>
+            <Link
+              href="?collection=sessions"
+              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700 transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
+            >
+              Schedule Session
+              <CaretRight size={14} />
+            </Link>
           </div>
         </section>
 
