@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   MapPin,
@@ -29,29 +30,50 @@ export interface EventSummary {
 
 interface ActiveEventOverviewProps {
   events: EventSummary[];
-  initialActiveEventId: string | null;
+  /** Active event id resolved from the URL `eventId` (or newest-fallback). */
+  activeEventId: string | null;
+  /** Server-side counts for the active event, scoped via getEventMetrics. */
   speakerCount: number;
   sessionCount: number;
   volunteerCount: number;
 }
 
 /**
- * The "Active Event Overview" card on the operations dashboard. The active
- * event is chosen from a dropdown of every event in the system; selecting one
- * updates the displayed context instantly, with no page refresh.
+ * The "Active Event Overview" card on the operations dashboard.
+ *
+ * Switching the dropdown pushes `?eventId=...` into the URL, which forces the
+ * server component (`app/operations/page.tsx`) to recompute per-event counts
+ * (via `getEventMetrics`) and re-render this card with fresh props. So
+ * switching actually changes the displayed people — it isn't cosmetic.
  */
 export function ActiveEventOverview({
   events,
-  initialActiveEventId,
+  activeEventId,
   speakerCount,
   sessionCount,
   volunteerCount,
 }: ActiveEventOverviewProps) {
-  const [activeEventId, setActiveEventId] = useState<string | null>(
-    initialActiveEventId
-  );
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const activeEvent = events.find((e) => e._id === activeEventId) ?? null;
+
+  /**
+   * Switching events pushes `eventId` into the query string. This triggers a
+   * server re-render of the whole page, which scopes every metric to the new
+   * event and flows the new values back through props.
+   */
+  const handleEventChange = (value: string) => {
+    const params = new URLSearchParams();
+    params.set("eventId", value);
+    startTransition(() => {
+      router.push(`/operations?${params.toString()}`);
+    });
+  };
+
+  // While a navigation is pending, dim the numbers so the switch feels
+  // responsive even before the server round-trip completes.
+  const countsOpacity = isPending ? "opacity-50" : "opacity-100";
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md">
@@ -72,7 +94,7 @@ export function ActiveEventOverview({
             {events.length > 0 && (
               <Select
                 value={activeEventId ?? undefined}
-                onValueChange={(value) => setActiveEventId(value)}
+                onValueChange={handleEventChange}
               >
                 <SelectTrigger className="h-9 w-full max-w-[16rem] gap-2 rounded-xl border-slate-200 bg-white text-sm font-medium text-slate-700">
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -129,7 +151,9 @@ export function ActiveEventOverview({
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Speakers
                   </p>
-                  <p className="text-xl font-bold text-slate-900">
+                  <p
+                    className={`text-xl font-bold text-slate-900 transition-opacity ${countsOpacity}`}
+                  >
                     {speakerCount}
                   </p>
                 </div>
@@ -137,7 +161,9 @@ export function ActiveEventOverview({
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Sessions
                   </p>
-                  <p className="text-xl font-bold text-slate-900">
+                  <p
+                    className={`text-xl font-bold text-slate-900 transition-opacity ${countsOpacity}`}
+                  >
                     {sessionCount}
                   </p>
                 </div>
@@ -145,7 +171,9 @@ export function ActiveEventOverview({
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Volunteers
                   </p>
-                  <p className="text-xl font-bold text-slate-900">
+                  <p
+                    className={`text-xl font-bold text-slate-900 transition-opacity ${countsOpacity}`}
+                  >
                     {volunteerCount}
                   </p>
                 </div>
@@ -154,8 +182,8 @@ export function ActiveEventOverview({
                     Status
                   </p>
                   <div className="mt-1">
-                    <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                      80% Ready
+                    <span className="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-bold capitalize text-indigo-700">
+                      {activeEvent.status ?? "—"}
                     </span>
                   </div>
                 </div>
